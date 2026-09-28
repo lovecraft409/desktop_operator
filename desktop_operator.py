@@ -21,10 +21,20 @@ def find_file(name, search_root="~"):
 
 def copy_file(source, destination):
     try:
-        shutil.copy(source, destination)
+        if os.path.isdir(source):
+            shutil.copytree(source, destination)
+        else:
+            shutil.copy(source, destination)
         return f"Copied {source} to {destination}"
     except Exception as e:
         return f"Error copying: {e}"
+
+def create_folder(path):
+    try:
+        os.makedirs(path, exist_ok=True)
+        return f"Created folder {path}"
+    except Exception as e:
+        return f"Error creating folder: {e}"
 
 def move_file(source, destination):
     try:
@@ -46,6 +56,7 @@ Respond with exactly ONE JSON object per reply. No explanations, no notes, no ex
 {{"action": "copy_file", "source": "...", "destination": "..."}}
 {{"action": "move_file", "source": "...", "destination": "..."}}
 {{"action": "reply", "message": "..."}}
+{{"action": "create_folder", "path": "..."}}
 
 RULES:
 - Return only ONE action per response.
@@ -54,6 +65,7 @@ RULES:
 - Only use copy_file/move_file once you have a REAL, exact path (given by the user or returned by a search).
 - Common folders: {home}/Desktop, {home}/Downloads, {home}/Documents.
 - Folder names in find_folder are just the name (like "operator"), not a full path.
+- Use create_folder to make a new folder. The path must be the full path, like {home}/Desktop/newfolder.
 
 EXAMPLES:
 User: hi
@@ -148,3 +160,15 @@ while True:
             print("Cancelled.")
             messages.append({"role": "assistant", "content": reply})
             messages.append({"role": "user", "content": "Move was not allowed by user."})
+
+    elif action["action"] == "create_folder":
+        confirm = input(f"Agent wants to create folder: {action['path']}\nAllow? (y/n): ")
+        if confirm.lower() == "y":
+            result = create_folder(action["path"])
+            print(result)
+            messages.append({"role": "assistant", "content": reply})
+            messages.append({"role": "user", "content": result})
+        else:
+            print("Cancelled.")
+            messages.append({"role": "assistant", "content": reply})
+            messages.append({"role": "user", "content": "Creating the folder was not allowed by user."})
