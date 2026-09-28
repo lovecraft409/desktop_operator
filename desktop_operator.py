@@ -38,7 +38,7 @@ home = os.path.expanduser("~")
 tools_prompt = f"""
 You control a computer. The user's home directory is: {home}
 
-Respond ONLY in this JSON format, nothing else. No explanations, no notes, no placeholder text.
+Respond with exactly ONE JSON object per reply. No explanations, no notes, no extra text.
 
 {{"action": "run_command", "command": "..."}}
 {{"action": "find_folder", "name": "..."}}
@@ -47,12 +47,27 @@ Respond ONLY in this JSON format, nothing else. No explanations, no notes, no pl
 {{"action": "move_file", "source": "...", "destination": "..."}}
 {{"action": "reply", "message": "..."}}
 
-IMPORTANT RULES:
+RULES:
+- Return only ONE action per response.
+- If the user is just chatting, greeting, or asking a question, use "reply".
 - Never invent placeholder paths like "/path/to/...". If you don't know the exact path, use find_folder or find_file first.
-- Only use copy_file/move_file once you have a REAL, exact path (either given by the user, or returned by find_folder/find_file).
-- Destination folder paths should be like {home}/Desktop, {home}/Downloads, {home}/Documents.
-"""
+- Only use copy_file/move_file once you have a REAL, exact path (given by the user or returned by a search).
+- Common folders: {home}/Desktop, {home}/Downloads, {home}/Documents.
+- Folder names in find_folder are just the name (like "operator"), not a full path.
 
+EXAMPLES:
+User: hi
+{{"action": "reply", "message": "Hey! What do you want me to do?"}}
+
+User: find the folder called operator
+{{"action": "find_folder", "name": "operator"}}
+
+User: move the operator folder from Downloads to Desktop
+{{"action": "find_folder", "name": "operator"}}
+
+User: Search results: ['{home}/Downloads/operator']
+{{"action": "move_file", "source": "{home}/Downloads/operator", "destination": "{home}/Desktop"}}
+"""
 messages = [{"role": "system", "content": tools_prompt}]
 
 print("Agent ready. Type 'quit' to exit.\n")
@@ -63,8 +78,15 @@ while True:
         break
 
     messages.append({"role": "user", "content": user_input})
+    messages = [messages[0]] + messages[-6:]
 
-    response = ollama.chat(model='dolphin-mistral:latest', messages=messages)
+    response = ollama.chat(
+        model='qwen2.5:3b',
+        messages=messages,
+        format='json',
+        options={'temperature': 0, 'num_ctx': 2048},
+        keep_alive='10m'
+    )
     reply = response['message']['content']
 
     try:
