@@ -43,6 +43,29 @@ def move_file(source, destination):
     except Exception as e:
         return f"Error moving: {e}"
 
+
+def create_file(path, content="", count=1):
+    os.makedirs(os.path.dirname(path), exist_ok=True)
+    results = []
+    if count == 1:
+        try:
+            with open(path, "w") as f:
+                f.write(content)
+            results.append(f"Created file {path}")
+        except Exception as e:
+            results.append(f"Error creating file: {e}")
+    else:
+        base, ext = os.path.splitext(path)
+        for i in range(1, count + 1):
+            numbered_path = f"{base}{i}{ext}"
+            try:
+                with open(numbered_path, "w") as f:
+                    f.write(content)
+                results.append(f"Created file {numbered_path}")
+            except Exception as e:
+                results.append(f"Error creating {numbered_path}: {e}")
+    return "\n".join(results)
+
 home = os.path.expanduser("~")
 
 tools_prompt = f"""
@@ -57,6 +80,7 @@ Respond with exactly ONE JSON object per reply. No explanations, no notes, no ex
 {{"action": "move_file", "source": "...", "destination": "..."}}
 {{"action": "reply", "message": "..."}}
 {{"action": "create_folder", "path": "..."}}
+{{"action": "create_file", "path": "...", "content": "...", "count": 1}}
 
 RULES:
 - Return only ONE action per response.
@@ -66,6 +90,7 @@ RULES:
 - Common folders: {home}/Desktop, {home}/Downloads, {home}/Documents.
 - Folder names in find_folder are just the name (like "operator"), not a full path.
 - Use create_folder to make a new folder. The path must be the full path, like {home}/Desktop/newfolder.
+- For multiple files, set "count" to how many, and give a base path/name. Files will be numbered automatically (e.g. file1.txt, file2.txt).
 
 EXAMPLES:
 User: hi
@@ -79,6 +104,9 @@ User: move the operator folder from Downloads to Desktop
 
 User: Search results: ['{home}/Downloads/operator']
 {{"action": "move_file", "source": "{home}/Downloads/operator", "destination": "{home}/Desktop"}}
+
+User: create 10 txt files with content hi
+{{"action": "create_file", "path": "{home}/Desktop/file.txt", "content": "hi", "count": 10}}
 """
 messages = [{"role": "system", "content": tools_prompt}]
 
@@ -172,3 +200,16 @@ while True:
             print("Cancelled.")
             messages.append({"role": "assistant", "content": reply})
             messages.append({"role": "user", "content": "Creating the folder was not allowed by user."})
+
+    elif action["action"] == "create_file":
+        count = action.get("count", 1)
+        confirm = input(f"Agent wants to create {count} file(s) at: {action['path']}\nAllow? (y/n): ")
+        if confirm.lower() == "y":
+            result = create_file(action["path"], action.get("content", ""), count)
+            print(result)
+            messages.append({"role": "assistant", "content": reply})
+            messages.append({"role": "user", "content": result})
+        else:
+            print("Cancelled.")
+            messages.append({"role": "assistant", "content": reply})
+            messages.append({"role": "user", "content": "Creating the file(s) was not allowed by user."})
